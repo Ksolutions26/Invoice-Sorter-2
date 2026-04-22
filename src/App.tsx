@@ -21,8 +21,6 @@ const now = new Date();
 const currentMonth = now.getMonth();
 const currentYear = now.getFullYear();
 
-const API_KEY = (import.meta.env.VITE_ANTHROPIC_API_KEY || "").trim();
-
 interface Invoice {
   id: string;
   file: File;
@@ -33,7 +31,6 @@ interface Invoice {
   amount?: string;
   date?: string;
   description?: string;
-  confidence?: string;
 }
 
 interface RecurringBill {
@@ -149,9 +146,15 @@ export default function App() {
   };
 
   const analyzeInvoice = async (base64Data: string) => {
+    const apiKey = (window as any).__ANTHROPIC_KEY__ || import.meta.env.VITE_ANTHROPIC_API_KEY || "";
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
@@ -161,6 +164,10 @@ export default function App() {
         ]}]
       })
     });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`API error ${response.status}: ${err}`);
+    }
     const data = await response.json();
     const text = data.content?.find((b: any) => b.type === "text")?.text || "{}";
     return JSON.parse(text.replace(/```json|```/g, "").trim());
@@ -174,13 +181,12 @@ export default function App() {
       const id = `${file.name}-${Date.now()}-${Math.random()}`;
       setInvoices(prev => [...prev, { id, file, name: file.name, status: "processing", folder: null }]);
       try {
-        if (!API_KEY) throw new Error("No API key configured");
         const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res((r.result as string).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
         const result = await analyzeInvoice(base64);
         if (result.folder && !folders.includes(result.folder)) result.folder = folders[0];
         setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: "done", ...result } : inv));
       } catch (err: any) {
-        setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: "error", folder: folders[0], description: `Error: ${err?.message || err}` } : inv));
+        setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: "error", folder: folders[0], description: `Error: ${err?.message || String(err)}` } : inv));
       }
     }
   };
