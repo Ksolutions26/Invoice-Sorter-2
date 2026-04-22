@@ -21,7 +21,7 @@ const now = new Date();
 const currentMonth = now.getMonth();
 const currentYear = now.getFullYear();
 
-const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
+const API_KEY = (import.meta.env.VITE_ANTHROPIC_API_KEY || "").trim();
 
 interface Invoice {
   id: string;
@@ -174,12 +174,13 @@ export default function App() {
       const id = `${file.name}-${Date.now()}-${Math.random()}`;
       setInvoices(prev => [...prev, { id, file, name: file.name, status: "processing", folder: null }]);
       try {
+        if (!API_KEY) throw new Error("No API key configured");
         const base64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res((r.result as string).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
         const result = await analyzeInvoice(base64);
         if (result.folder && !folders.includes(result.folder)) result.folder = folders[0];
         setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: "done", ...result } : inv));
-      } catch {
-        setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: "error", folder: folders[0], description: "Could not analyze" } : inv));
+      } catch (err: any) {
+        setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: "error", folder: folders[0], description: `Error: ${err?.message || err}` } : inv));
       }
     }
   };
