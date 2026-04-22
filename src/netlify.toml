@@ -1,0 +1,6 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_ANTHROPIC_API_KEY = "$VITE_ANTHROPIC_API_KEY"
