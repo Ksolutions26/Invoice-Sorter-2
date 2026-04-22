@@ -146,31 +146,16 @@ export default function App() {
   };
 
   const analyzeInvoice = async (base64Data: string) => {
-    const apiKey = (window as any).__ANTHROPIC_KEY__ || import.meta.env.VITE_ANTHROPIC_API_KEY || "";
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("/.netlify/functions/analyze", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64Data } },
-          { type: "text", text: `Analyze this invoice and return ONLY a JSON object (no markdown, no backticks):\n{\n  "folder": pick best match from: ${JSON.stringify(folders)},\n  "vendor": company or person name,\n  "amount": total as string e.g. "$1,234.56",\n  "date": invoice date as string,\n  "description": one-sentence summary,\n  "confidence": "high"|"medium"|"low"\n}` }
-        ]}]
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64: base64Data, folders })
     });
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`API error ${response.status}: ${err}`);
+      throw new Error(`Function error ${response.status}: ${err}`);
     }
-    const data = await response.json();
-    const text = data.content?.find((b: any) => b.type === "text")?.text || "{}";
-    return JSON.parse(text.replace(/```json|```/g, "").trim());
+    return await response.json();
   };
 
   const processFiles = async (files: FileList | null) => {
@@ -324,6 +309,9 @@ export default function App() {
                           {inv.date&&<span>📅 {inv.date}</span>}
                           {inv.description&&<p className="mt-1 text-gray-400 italic">{inv.description}</p>}
                         </div>
+                      )}
+                      {inv.status==="error"&&inv.description&&(
+                        <p className="mt-1 text-xs text-red-400 italic">{inv.description}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
