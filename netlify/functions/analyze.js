@@ -7,7 +7,7 @@ exports.handler = async (event) => {
 
   try {
     const { base64, folders } = JSON.parse(event.body);
-    const client = new Anthropic({ apiKey: process.env.VITE_ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
